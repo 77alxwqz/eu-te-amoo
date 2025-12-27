@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Para Izabelly ❤️</title>
+    <style>
+        /* Reset básico e estilo do corpo */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Impede barras de rolagem */
+            background-color: #0f0505; /* Fundo escuro romântico */
+            font-family: 'Arial', sans-serif;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Instrução inicial pequena que desaparece */
+        #hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 182, 193, 0.5);
+            pointer-events: none;
+            font-size: 14px;
+            animation: pulse 2s infinite;
+            z-index: 2;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.3; }
+        }
+
+        /* Botão Mágico Gemini */
+        #aiButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 182, 193, 0.3);
+            color: #ffb6c1;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #aiButton:hover {
+            background: rgba(255, 182, 193, 0.2);
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 105, 180, 0.4);
+        }
+
+        /* Modal do Poema */
+        #poemModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 500px;
+            background: rgba(20, 10, 10, 0.95);
+            border: 1px solid #ff3366;
+            border-radius: 15px;
+            padding: 30px;
+            z-index: 20;
+            box-shadow: 0 0 30px rgba(255, 0, 50, 0.3);
+            color: #fff;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #poemModal.visible {
+            opacity: 1;
+        }
+
+        #poemText {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            white-space: pre-wrap; /* Mantém a formatação do poema */
+            font-style: italic;
+            color: #ffd1dc;
+        }
+
+        #closeModal {
+            background: #ff3366;
+            border: none;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        #loading {
+            display: none;
+            color: #ff6699;
+            margin-bottom: 15px;
+        }
+
+        /* Overlay para escurecer o fundo quando o modal abre */
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 15;
+        }
+
+    </style>
+    <!-- Import map necessário para usar a API do Gemini via CDN -->
+    <script type="importmap">
+        {
+          "imports": {
+            "@google/generative-ai": "https://esm.run/@google/generative-ai"
+          }
+        }
+    </script>
+</head>
+<body>
+
+    <button id="aiButton">Criar Poema para Ela ✨</button>
+    <div id="hint">Toque na tela ou mova o mouse...</div>
+    <canvas id="canvas"></canvas>
+
+    <!-- Overlay e Modal -->
+    <div id="overlay"></div>
+    <div id="poemModal">
+        <h3 style="color: #ff3366; margin-top: 0;">Para Minha Izabelly ❤️</h3>
+        <div id="loading">✨ Criando algo especial... ✨</div>
+        <div id="poemText"></div>
+        <button id="closeModal">Fechar</button>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        // --- Configuração Gemini ---
+        const apiKey = ""; // A chave será injetada automaticamente
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-09-2025" });
+
+        const aiButton = document.getElementById('aiButton');
+        const modal = document.getElementById('poemModal');
+        const overlay = document.getElementById('overlay');
+        const poemText = document.getElementById('poemText');
+        const loading = document.getElementById('loading');
+        const closeModal = document.getElementById('closeModal');
+
+        aiButton.addEventListener('click', async () => {
+            // Mostrar modal e loading
+            overlay.style.display = 'block';
+            modal.style.display = 'block';
+            // Pequeno delay para permitir a transição de opacidade
+            setTimeout(() => modal.classList.add('visible'), 10);
+            
+            loading.style.display = 'block';
+            poemText.innerText = '';
+            closeModal.style.display = 'none';
+
+            try {
+                const prompt = "Escreva um poema curto, muito romântico, doce e apaixonado para minha namorada chamada Izabelly. O poema deve ter no máximo 3 estrofes e falar sobre amor eterno. Use emojis delicados.";
+                
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
+
+                // Efeito de digitação suave
+                loading.style.display = 'none';
+                closeModal.style.display = 'inline-block';
+                typeWriter(text, 0);
+
+            } catch (error) {
+                loading.style.display = 'none';
+                poemText.innerText = "O amor é tão grande que fiquei sem palavras... Tente novamente ❤️";
+                closeModal.style.display = 'inline-block';
+                console.error("Erro na API:", error);
+            }
+        });
+
+        function typeWriter(text, i) {
+            if (i < text.length) {
+                poemText.innerHTML += text.charAt(i);
+                setTimeout(() => typeWriter(text, i + 1), 30); // Velocidade da digitação
+            }
+        }
+
+        const closeAction = () => {
+            modal.classList.remove('visible');
+            setTimeout(() => {
+                modal.style.display = 'none';
+                overlay.style.display = 'none';
+            }, 500); // Espera a transição acabar
+        };
+
+        closeModal.addEventListener('click', closeAction);
+        overlay.addEventListener('click', closeAction);
+
+        // --- Código Original da Animação ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let particles = [];
+        let textCoordinates = [];
+        
+        // Configuração da frase
+        const textLines = [
+            "eu te amo,",
+            "minha",
+            "izabelly❤️"
+        ];
+
+        // Estado do mouse/toque
+        let mouse = {
+            x: null,
+            y: null,
+            radius: 150,
+            active: false
+        };
+
+        // Detecta se é mobile para ajustes finos
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // --- Configuração da Partícula (Coração) ---
+        class Particle {
+            constructor(x, y) {
+                this.x = Math.random() * width; // Posição atual aleatória inicial
+                this.y = Math.random() * height;
+                this.targetX = x; // Onde ela deve ir para formar o texto
+                this.targetY = y;
+                this.size = Math.random() * 2 + 1; // Tamanho do coração
+                // Cores variadas entre vermelho e rosa
+                const colors = ['#ff0000', '#ff3366', '#ff6699', '#ff99cc', '#ffccdd'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Velocidade de movimento aleatória para o modo "disperso"
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                
+                // Atrito e aceleração para o movimento de junção
+                this.friction = 0.93;
+                this.ease = 0.05 + Math.random() * 0.05;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                // Desenha um formato simples de coração usando arcos ou apenas círculos para performance
+                // Para performance com muitas partículas, círculos são melhores, mas vamos tentar fazer parecer corações
+                // Desenhando coração simplificado:
+                const s = this.size;
+                ctx.moveTo(this.x, this.y);
+                ctx.bezierCurveTo(this.x - s/2, this.y - s/2, this.x - s, this.y + s/3, this.x, this.y + s);
+                ctx.bezierCurveTo(this.x + s, this.y + s/3, this.x + s/2, this.y - s/2, this.x, this.y);
+                ctx.fill();
+            }
+
+            update() {
+                // Lógica de interação
+                // Se o mouse estiver ativo (movendo ou clicando), as partículas vão para o alvo (texto)
+                // Se não, elas flutuam
+                
+                if (mouse.active) {
+                    // Movimento em direção ao alvo (formar texto)
+                    let dx = this.targetX - this.x;
+                    let dy = this.targetY - this.y;
+                    
+                    this.x += dx * this.ease;
+                    this.y += dy * this.ease;
+                } else {
+                    // Modo disperso (flutuando)
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // Rebater nas bordas
+                    if (this.x < 0 || this.x > width) this.vx *= -1;
+                    if (this.y < 0 || this.y > height) this.vy *= -1;
+                }
+
+                this.draw();
+            }
+        }
+
+        // --- Processamento do Texto ---
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            
+            particles = [];
+            textCoordinates = [];
+
+            // Configurações de fonte responsiva
+            let fontSize = width < 600 ? 50 : 100;
+            if (width < 400) fontSize = 40;
+            
+            ctx.font = `bold ${fontSize}px Arial`;
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Calcular posição vertical para centralizar as linhas
+            const lineHeight = fontSize * 1.2;
+            const totalHeight = textLines.length * lineHeight;
+            const startY = (height - totalHeight) / 2 + lineHeight / 2;
+
+            // Desenhar o texto na tela (invisivelmente primeiro para pegar os dados)
+            textLines.forEach((line, index) => {
+                ctx.fillText(line, width / 2, startY + (index * lineHeight));
+            });
+
+            // Escanear os pixels
+            // A densidade controla quantos corações formam o texto.
+            // Mobile precisa de menos partículas para não travar.
+            const density = isMobile ? 6 : 4; 
+            
+            const textData = ctx.getImageData(0, 0, width, height);
+            
+            // Limpa o canvas após pegar os dados
+            ctx.clearRect(0, 0, width, height);
+
+            for (let y = 0; y < height; y += density) {
+                for (let x = 0; x < width; x += density) {
+                    // Verifica o canal Alpha (transparência)
+                    // (y * 4 * textData.width) + (x * 4) + 3 é a posição do alpha
+                    if (textData.data[(y * 4 * textData.width) + (x * 4) + 3] > 128) {
+                        textCoordinates.push({x: x, y: y});
+                    }
+                }
+            }
+
+            // Criar partículas para cada coordenada de texto encontrada
+            textCoordinates.forEach(coord => {
+                particles.push(new Particle(coord.x, coord.y));
+            });
+
+            // Adicionar partículas extras para o fundo (decoração)
+            const extraParticles = isMobile ? 100 : 300;
+            for(let i=0; i<extraParticles; i++){
+                // Partículas extras sem alvo fixo (ou alvo aleatório que muda)
+                // Vamos dar a elas um alvo que é elas mesmas para pararem quando o texto forma
+                // ou simplesmente deixá-las flutuando no fundo
+                let p = new Particle(Math.random()*width, Math.random()*height);
+                // Hack: definir target como posição atual para elas "congelarem" ou 
+                // dar um target aleatório. Vamos deixá-las livres.
+                // Na lógica de update, se mouse active, elas vão para target.
+                // Vamos definir target aleatório para elas se juntarem ao redor ou sumirem.
+                p.targetX = Math.random() * width;
+                p.targetY = Math.random() * height;
+                particles.push(p);
+            }
+        }
+
+        // --- Loop de Animação ---
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // --- Event Listeners ---
+        
+        // Resize
+        window.addEventListener('resize', () => {
+            init();
+        });
+
+        // Mouse Move
+        window.addEventListener('mousemove', (e) => {
+            // Se estiver em cima do modal ou botão, não ativa os corações
+            if (e.target.closest('#poemModal') || e.target.closest('#aiButton')) return;
+
+            mouse.active = true;
+            mouse.x = e.x;
+            mouse.y = e.y;
+            
+            // Resetar timer para voltar a espalhar se parar de mexer (opcional)
+            clearTimeout(mouse.timer);
+            mouse.timer = setTimeout(() => {
+                mouse.active = false;
+            }, 5000); // 5 segundos sem mexer, eles espalham de novo
+        });
+
+        // Touch (Celular)
+        window.addEventListener('touchstart', (e) => {
+            if (e.target.closest('#poemModal') || e.target.closest('#aiButton')) return;
+            
+            mouse.active = true;
+            mouse.x = e.touches[0].clientX;
+            mouse.y = e.touches[0].clientY;
+        }, {passive: true});
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.target.closest('#poemModal')) return;
+            
+            mouse.active = true;
+            mouse.x = e.touches[0].clientX;
+            mouse.y = e.touches[0].clientY;
+        }, {passive: true});
+
+        window.addEventListener('touchend', () => {
+            setTimeout(() => {
+                mouse.active = false;
+            }, 5000);
+        });
+
+        // Inicialização
+        init();
+        animate();
+
+    </script>
+</body>
+</html>
